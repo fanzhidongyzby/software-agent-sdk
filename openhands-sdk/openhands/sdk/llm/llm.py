@@ -111,6 +111,42 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LLMNoResponseError,
 )
 
+import socket
+
+class SocketPatcher(object):
+    _original_socket__init__ = None
+
+    @staticmethod
+    def _socket__init__(sock, family=-1, type=-1, proto=-1, fileno=None):
+        SocketPatcher._original_socket__init__(sock, family, type, proto, fileno)
+
+        if family != socket.AF_INET or type != socket.SOCK_STREAM:
+            return
+
+        # enable TCP Keep-Alive
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+        # configure for different platforms
+        if hasattr(socket, "TCP_KEEPALIVE"):  # macOS
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 30)
+
+        if hasattr(socket, "TCP_KEEPIDLE"):  # Linux
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+
+        if hasattr(socket, "TCP_KEEPINTVL"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+
+        if hasattr(socket, "TCP_KEEPCNT"):
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+
+    @classmethod
+    def run(cls) -> None:
+        if cls._original_socket__init__ is None:
+            cls._original_socket__init__ = socket.socket.__init__
+            socket.socket.__init__ = cls._socket__init__
+
 
 class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
     """Language model interface for OpenHands agents.
