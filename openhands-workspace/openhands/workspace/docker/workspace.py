@@ -227,6 +227,9 @@ class DockerWorkspace(RemoteWorkspace):
         if self.enable_gpu:
             flags += ["--gpus", "all"]
 
+        # Disable Docker Images Pulling
+        flags += ["--pull", "never"]
+
         # Run container
         run_cmd = [
             "docker",

@@ -882,6 +882,7 @@ class RemoteConversation(BaseConversation):
             logger.info(f"run() triggered successfully: {resp}")
 
         if blocking:
+            timeout = float(os.getenv("INSTANCE_TIMEOUT_SEC", timeout))
             self._wait_for_run_completion(poll_interval, timeout)
 
     def _wait_for_run_completion(
