@@ -147,6 +147,8 @@ class SocketPatcher(object):
             cls._original_socket__init__ = socket.socket.__init__
             socket.socket.__init__ = cls._socket__init__
 
+# 为 Socket 设置 Keepalive
+SocketPatcher.run()
 
 class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
     """Language model interface for OpenHands agents.
