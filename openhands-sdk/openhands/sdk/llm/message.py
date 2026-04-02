@@ -1,4 +1,5 @@
 import json
+import os
 from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Any, ClassVar, Literal
@@ -20,6 +21,7 @@ from openhands.sdk.utils.deprecation import warn_deprecated
 
 logger = get_logger(__name__)
 
+_llm_gemini = os.getenv("LLM_GEMINI", False)
 
 class MessageToolCall(BaseModel):
     """Transport-agnostic tool call representation.
@@ -83,14 +85,23 @@ class MessageToolCall(BaseModel):
 
     def to_chat_dict(self) -> dict[str, Any]:
         """Serialize to OpenAI Chat Completions tool_calls format."""
-        return {
+        tool_call = {
             "id": self.id,
             "type": "function",
             "function": {
                 "name": self.name,
                 "arguments": self.arguments,
-            },
+            }
         }
+
+        if _llm_gemini:
+            tool_call["extra_content"] = {
+                "google": {
+                    "thought_signature": "skip_thought_signature_validator"
+                }
+            }
+
+        return tool_call
 
     def to_responses_dict(self) -> dict[str, Any]:
         """Serialize to OpenAI Responses 'function_call' input item format."""
@@ -319,9 +330,17 @@ class Message(BaseModel):
             message_dict = self._string_serializer()
 
         # Assistant function_call(s)
-        if self.role == "assistant" and self.tool_calls:
-            message_dict["tool_calls"] = [tc.to_chat_dict() for tc in self.tool_calls]
-            self._remove_content_if_empty(message_dict)
+        if self.role == "assistant":
+            if self.tool_calls:
+                message_dict["tool_calls"] = [tc.to_chat_dict() for tc in self.tool_calls]
+                self._remove_content_if_empty(message_dict)
+            else:
+                if _llm_gemini:
+                    message_dict["extra_content"] = {
+                        "google": {
+                            "thought_signature": "skip_thought_signature_validator"
+                        }
+                    }
 
         # Tool result (observation) threading
         if self.role == "tool" and self.tool_call_id is not None:
