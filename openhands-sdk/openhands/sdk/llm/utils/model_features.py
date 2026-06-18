@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 
@@ -10,9 +11,17 @@ def model_matches(model: str, patterns: list[str]) -> bool:
     raw = (model or "").strip().lower()
     for pat in patterns:
         token = pat.strip().lower()
+        if token == "*":
+            return True
         if token in raw:
             return True
     return False
+
+
+def env_model_patterns(name: str) -> list[str]:
+    """Read comma-separated model match tokens from an environment variable."""
+    value = os.environ.get(name, "")
+    return [token.strip().lower() for token in value.split(",") if token.strip()]
 
 
 def apply_ordered_model_rules(model: str, rules: list[str]) -> bool:
@@ -172,7 +181,13 @@ def get_features(model: str) -> ModelFeatures:
         supports_stop_words=not model_matches(model, SUPPORTS_STOP_WORDS_FALSE_MODELS),
         supports_responses_api=model_matches(model, RESPONSES_API_MODELS),
         force_string_serializer=model_matches(model, FORCE_STRING_SERIALIZER_MODELS),
-        send_reasoning_content=model_matches(model, SEND_REASONING_CONTENT_MODELS),
+        send_reasoning_content=model_matches(
+            model,
+            [
+                *SEND_REASONING_CONTENT_MODELS,
+                *env_model_patterns("OPENHANDS_SEND_REASONING_CONTENT_MODELS"),
+            ],
+        ),
         # Extended prompt_cache_retention support follows ordered include/exclude rules.
         supports_prompt_cache_retention=apply_ordered_model_rules(
             model, PROMPT_CACHE_RETENTION_MODELS
